@@ -1,55 +1,63 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Check, X, Eye, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiService, PendingProfile } from '@/services/api';
 
 export const ProfileVerification: React.FC = () => {
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  const pendingProfiles = [
-    {
-      id: '1',
-      userId: 'user_123',
-      name: 'Dr. Maria Garcia',
-      userType: 'doctor',
-      profileImage: '/placeholder.svg',
-      medicalLicense: '/placeholder.svg',
-      submittedAt: '2 hours ago',
-      specialty: 'Oncology'
-    },
-    {
-      id: '2',
-      userId: 'user_456',
-      name: 'Dr. James Wilson',
-      userType: 'psychiatrist',
-      profileImage: '/placeholder.svg',
-      medicalLicense: '/placeholder.svg',
-      submittedAt: '5 hours ago',
-      specialty: 'Clinical Psychology'
-    },
-    {
-      id: '3',
-      userId: 'user_789',
-      name: 'PharmD Lisa Chen',
-      userType: 'pharmacist',
-      profileImage: '/placeholder.svg',
-      medicalLicense: '/placeholder.svg',
-      submittedAt: '1 day ago',
-      specialty: 'Clinical Pharmacy'
-    },
-  ];
+  useEffect(() => {
+    fetchPendingProfiles();
+  }, []);
 
-  const handleVerification = (action: 'approve' | 'reject', profileId: string, name: string) => {
-    console.log(`${action} profile ${profileId}`);
-    toast({
-      title: action === 'approve' ? "Profile Approved" : "Profile Rejected",
-      description: `${name}'s profile has been ${action}d`,
-      variant: action === 'approve' ? "default" : "destructive"
-    });
+  const fetchPendingProfiles = async () => {
+    try {
+      setIsLoading(true);
+      const profiles = await apiService.getPendingProfiles();
+      setPendingProfiles(profiles);
+    } catch (error) {
+      console.error('Error fetching pending profiles:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pending profiles",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerification = async (action: 'approve' | 'reject', profileId: string, name: string) => {
+    try {
+      if (action === 'approve') {
+        await apiService.approveProfile(profileId);
+      } else {
+        await apiService.rejectProfile(profileId);
+      }
+      
+      // Remove the profile from the list
+      setPendingProfiles(prev => prev.filter(p => p.id !== profileId));
+      
+      toast({
+        title: action === 'approve' ? "Profile Approved" : "Profile Rejected",
+        description: `${name}'s profile has been ${action}d`,
+        variant: action === 'approve' ? "default" : "destructive"
+      });
+    } catch (error) {
+      console.error('Error during verification:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${action} profile`,
+        variant: "destructive"
+      });
+    }
   };
 
   const getUserTypeColor = (type: string) => {
@@ -61,79 +69,99 @@ export const ProfileVerification: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Profile Verification</h1>
+          <p className="text-gray-600 mt-2">Loading pending profiles...</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-40 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Profile Verification</h1>
-        <p className="text-gray-600 mt-2">Review and verify professional profiles</p>
+        <p className="text-gray-600 mt-2">Review and verify professional profiles ({pendingProfiles.length} pending)</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {pendingProfiles.map((profile) => (
-          <Card key={profile.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-4">
-              <div className="flex items-center space-x-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={profile.profileImage} />
-                  <AvatarFallback>{profile.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{profile.name}</CardTitle>
-                  <CardDescription>{profile.specialty}</CardDescription>
+      {pendingProfiles.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {pendingProfiles.map((profile) => (
+            <Card key={profile.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={profile.profileImage} />
+                    <AvatarFallback>{profile.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{profile.name}</CardTitle>
+                    <CardDescription>{profile.specialty}</CardDescription>
+                  </div>
                 </div>
-              </div>
-              <Badge className={getUserTypeColor(profile.userType)}>
-                {profile.userType.charAt(0).toUpperCase() + profile.userType.slice(1)}
-              </Badge>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Profile Image</span>
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
-                  </Button>
+                <Badge className={getUserTypeColor(profile.userType)}>
+                  {profile.userType.charAt(0).toUpperCase() + profile.userType.slice(1)}
+                </Badge>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Profile Image</span>
+                    <Button variant="outline" size="sm">
+                      <Eye className="w-4 h-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Medical License</span>
+                    <Button variant="outline" size="sm">
+                      <FileText className="w-4 h-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Medical License</span>
-                  <Button variant="outline" size="sm">
-                    <FileText className="w-4 h-4 mr-1" />
-                    View
-                  </Button>
+                
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-gray-500 mb-3">
+                    User ID: {profile.userId} • Submitted {profile.submittedAt}
+                  </p>
+                  <div className="flex space-x-2">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      size="sm"
+                      onClick={() => handleVerification('approve', profile.id, profile.name)}
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      size="sm"
+                      onClick={() => handleVerification('reject', profile.id, profile.name)}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Reject
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="pt-2 border-t">
-                <p className="text-xs text-gray-500 mb-3">
-                  User ID: {profile.userId} • Submitted {profile.submittedAt}
-                </p>
-                <div className="flex space-x-2">
-                  <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    size="sm"
-                    onClick={() => handleVerification('approve', profile.id, profile.name)}
-                  >
-                    <Check className="w-4 h-4 mr-1" />
-                    Approve
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => handleVerification('reject', profile.id, profile.name)}
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {pendingProfiles.length === 0 && (
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
         <Card>
           <CardContent className="text-center py-12">
             <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />

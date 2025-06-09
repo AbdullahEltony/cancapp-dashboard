@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiService } from '@/services/api';
 
 interface User {
   id: string;
@@ -48,26 +49,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Mock login for demo - replace with actual API call
-      if (email === 'admin@cancapp.com' && password === 'admin123') {
-        const mockUser: User = {
-          id: '1',
-          email: 'admin@cancapp.com',
-          userName: 'admin',
-          name: 'CancApp Administrator',
-          address: 'Admin Office',
-          image: '/placeholder.svg',
-          userType: 'admin'
-        };
-        const mockToken = 'mock-jwt-token-' + Date.now();
-        
-        setUser(mockUser);
-        setToken(mockToken);
-        localStorage.setItem('adminToken', mockToken);
-        localStorage.setItem('adminUser', JSON.stringify(mockUser));
-        return true;
-      }
-      return false;
+      const response = await apiService.login(email, password);
+      
+      setUser(response.user);
+      setToken(response.token);
+      localStorage.setItem('adminToken', response.token);
+      localStorage.setItem('adminUser', JSON.stringify(response.user));
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
