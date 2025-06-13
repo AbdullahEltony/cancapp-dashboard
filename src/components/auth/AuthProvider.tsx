@@ -1,19 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiService } from '@/services/api';
-
-interface User {
-  id: string;
-  email: string;
-  userName: string;
-  name: string;
-  address: string;
-  image: string;
-  userType: string;
-}
+import { apiService, AuthResponse } from '@/services/api';
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthResponse | null;
   token: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -31,18 +20,18 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for existing session
+    const savedUser = apiService.getStoredUser();
     const savedToken = localStorage.getItem('adminToken');
-    const savedUser = localStorage.getItem('adminUser');
     
     if (savedToken && savedUser) {
       setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      setUser(savedUser);
     }
     setIsLoading(false);
   }, []);
@@ -51,10 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiService.login(email, password);
       
-      setUser(response.user);
+      setUser(response);
       setToken(response.token);
-      localStorage.setItem('adminToken', response.token);
-      localStorage.setItem('adminUser', JSON.stringify(response.user));
       return true;
     } catch (error) {
       console.error('Login error:', error);
@@ -65,8 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
+    apiService.logout();
   };
 
   return (

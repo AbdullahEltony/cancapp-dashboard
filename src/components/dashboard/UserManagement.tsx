@@ -1,116 +1,66 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Shield, ShieldOff, AlertTriangle, Eye } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Shield, ShieldOff, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { apiService, User } from '@/services/api';
+import { apiService } from '@/services/api';
 
 export const UserManagement: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setIsLoading(true);
-      const usersData = await apiService.getUsers();
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+  const handleUserAction = async (action: string) => {
+    if (!userId.trim()) {
       toast({
         title: "Error",
-        description: "Failed to load users",
+        description: "Please enter a User ID",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      switch (action) {
+        case 'disable':
+          await apiService.disableUser(userId.trim());
+          toast({
+            title: "Success",
+            description: "User disabled successfully",
+          });
+          break;
+        case 'enable':
+          await apiService.enableUser(userId.trim());
+          toast({
+            title: "Success",
+            description: "User enabled successfully",
+          });
+          break;
+        case 'warning':
+          await apiService.addWarning(userId.trim());
+          toast({
+            title: "Success",
+            description: "Warning added successfully",
+          });
+          break;
+      }
+      
+      setUserId(''); // Clear the input after successful action
+    } catch (error) {
+      console.error('Error performing user action:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${action} user: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleUserAction = async (action: string, userId: string, userName: string) => {
-    try {
-      switch (action) {
-        case 'Disable':
-          await apiService.updateUserStatus(userId, 'disabled');
-          break;
-        case 'Enable':
-          await apiService.updateUserStatus(userId, 'active');
-          break;
-        case 'Add Warning':
-          await apiService.addUserWarning(userId, 'Administrative warning');
-          break;
-        case 'View Details':
-          // Handle view details - could open a modal or navigate to user detail page
-          console.log('View details for user:', userId);
-          break;
-      }
-      
-      if (action !== 'View Details') {
-        await fetchUsers(); // Refresh the users list
-      }
-      
-      toast({
-        title: "Action Completed",
-        description: `${action} applied to ${userName}`,
-      });
-    } catch (error) {
-      console.error('Error performing user action:', error);
-      toast({
-        title: "Error",
-        description: `Failed to ${action.toLowerCase()} user`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const getUserTypeColor = (type: string) => {
-    switch (type) {
-      case 'doctor': return 'bg-green-100 text-green-800';
-      case 'patient': return 'bg-blue-100 text-blue-800';
-      case 'pharmacist': return 'bg-purple-100 text-purple-800';
-      case 'psychiatrist': return 'bg-orange-100 text-orange-800';
-      case 'volunteer': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-  };
-
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-2">Loading users...</p>
-        </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -119,99 +69,106 @@ export const UserManagement: React.FC = () => {
         <p className="text-gray-600 mt-2">Manage user accounts, permissions, and warnings</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>User Accounts</CardTitle>
-              <CardDescription>View and manage all user accounts ({users.length} total)</CardDescription>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Actions</CardTitle>
+            <CardDescription>Perform actions on user accounts by entering their User ID</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="userId">User ID</Label>
               <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full sm:w-64"
+                id="userId"
+                placeholder="Enter user ID"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                disabled={isLoading}
               />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={user.image} />
-                      <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{user.name}</h3>
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge className={getUserTypeColor(user.userType)}>
-                          {user.userType.charAt(0).toUpperCase() + user.userType.slice(1)}
-                        </Badge>
-                        <Badge className={getStatusColor(user.status || 'active')}>
-                          {(user.status || 'active').charAt(0).toUpperCase() + (user.status || 'active').slice(1)}
-                        </Badge>
-                        {user.warnings && user.warnings > 0 && (
-                          <Badge variant="destructive" className="text-xs">
-                            {user.warnings} Warning{user.warnings > 1 ? 's' : ''}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleUserAction('View Details', user.id, user.name)}
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleUserAction('Add Warning', user.id, user.name)}
-                    >
-                      <AlertTriangle className="w-4 h-4 mr-1" />
-                      Warn
-                    </Button>
-                    {(user.status || 'active') === 'active' ? (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleUserAction('Disable', user.id, user.name)}
-                      >
-                        <ShieldOff className="w-4 h-4 mr-1" />
-                        Disable
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleUserAction('Enable', user.id, user.name)}
-                      >
-                        <Shield className="w-4 h-4 mr-1" />
-                        Enable
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No users found matching your search.</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                onClick={() => handleUserAction('disable')}
+                disabled={isLoading || !userId.trim()}
+                className="w-full"
+              >
+                <ShieldOff className="w-4 h-4 mr-2" />
+                Disable User
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={() => handleUserAction('enable')}
+                disabled={isLoading || !userId.trim()}
+                className="w-full"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Enable User
+              </Button>
+            </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => handleUserAction('warning')}
+              disabled={isLoading || !userId.trim()}
+              className="w-full"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Add Warning
+            </Button>
+            
+            {isLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Instructions</CardTitle>
+            <CardDescription>How to use the user management system</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Disable User</h4>
+                  <p className="text-sm text-gray-600">Temporarily disable a user account. The user will not be able to access the platform.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Enable User</h4>
+                  <p className="text-sm text-gray-600">Re-enable a previously disabled user account.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Add Warning</h4>
+                  <p className="text-sm text-gray-600">Add a warning to a user's account. Multiple warnings may lead to account suspension.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">Finding User IDs</h4>
+              <p className="text-sm text-blue-700">
+                You can find User IDs in the Profile Verification section or through user reports. 
+                The User ID is a unique identifier for each user account.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
