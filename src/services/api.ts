@@ -1,4 +1,4 @@
-const BASE_URL = 'http://cancapp.runasp.net';
+const BASE_URL = 'https://cancapp.runasp.net';
 
 // Types matching the backend models
 export interface AuthResponse {
@@ -112,7 +112,6 @@ class ApiService {
     // Handle empty response
     const responseText = await response.text();
     if (!responseText) {
-      // @ts-ignore
       return undefined;
     }
     try {
